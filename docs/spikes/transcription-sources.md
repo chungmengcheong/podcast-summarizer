@@ -110,6 +110,8 @@ The local diagnostic is `tests/check_youtube_transcript_access.py`. It activates
 
 **Control test, 2026-07-22:** For `PHL1j2ti420`, the script successfully exercised both controls. Copy returned 104,336 characters and the default `.txt` download returned 112,936 characters. Both included `>>` speaker-turn markers. The longer downloaded file is consistent with the modal's default **Include Timing** setting.
 
+**20VC validation, 2026-07-22:** The supplied [20VC videos page](https://www.youtube.com/@20VC/videos) returned ordinary `/watch?v=<video-id>` links, including the representative ID `HoRaqNWKcpM`. The browser diagnostic successfully exercised both transcript controls for that video: Copy returned 92,694 characters and the default `.txt` download returned 127,756 characters. Both contained `>>` speaker-turn markers. This clears the source-coverage question for the initial two shows; the production discovery parser still needs its own focused tests for correctly identifying and ordering the channel-page entries.
+
 For the product, prefer the Download route over browser clipboard access: it produces a file the tool can save directly and retains timing information. The Copy path remains a useful lightweight smoke test.
 
 ### Reference evidence
@@ -121,4 +123,3 @@ For the product, prefer the Download route over browser clipboard access: it pro
 ## Implications for summary design
 
 The summary prompt must avoid asserting who said a point unless the transcript itself provides clear context. It can report a disagreement as a disagreement in the discussion, but should qualify uncertain attribution. Speaker diarization is explicitly out of scope for v1.
-
