@@ -251,6 +251,116 @@ def test_pause_between_download_attempts_is_randomized(tmp_path: Path) -> None:
     assert pauses == [6.5]
 
 
+def test_default_downloader_reuses_one_browser_session_for_the_batch(tmp_path: Path) -> None:
+    config = sample_config()
+    queue = downloader.empty_queue(config["shows"])
+    for video_id in ("first__1234", "second_1234"):
+        queue["episodes"][f"youtube:all-in:{video_id}"] = downloader.new_episode_record(
+            config["shows"][0], {"video_id": video_id, "title": "Title"}, "2026-07-22T00:00:00Z"
+        )
+
+    class FakeSession:
+        def __init__(self) -> None:
+            self.open_count = 0
+            self.close_count = 0
+            self.downloaded_ids: list[str] = []
+
+        def open(self) -> None:
+            self.open_count += 1
+
+        def close(self) -> None:
+            self.close_count += 1
+
+        def restart(self) -> None:
+            raise AssertionError("A healthy browser session must not restart")
+
+        def download(self, episode: dict, destination: Path) -> None:
+            self.downloaded_ids.append(episode["source_episode_id"])
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text("Transcript", encoding="utf-8")
+
+    sessions: list[FakeSession] = []
+
+    def fake_session_factory(*_args: object) -> FakeSession:
+        session = FakeSession()
+        sessions.append(session)
+        return session
+
+    def fake_fetcher(url: str) -> str:
+        if url.endswith("/videos"):
+            return channel_html(("first__1234", "Title"))
+        return video_html("Title", "2026-07-17")
+
+    report = downloader.run_downloader(
+        config,
+        queue,
+        tmp_path / "queue.json",
+        tmp_path,
+        discover_only=False,
+        fetcher=fake_fetcher,
+        browser_session_factory=fake_session_factory,
+    )
+
+    assert report.downloaded == 2
+    assert len(sessions) == 1
+    assert sessions[0].open_count == 1
+    assert sessions[0].downloaded_ids == ["first__1234", "second_1234"]
+    assert sessions[0].close_count == 1
+
+
+def test_browser_context_failure_restarts_session_and_continues(tmp_path: Path) -> None:
+    config = sample_config()
+    queue = downloader.empty_queue(config["shows"])
+    for video_id in ("first__1234", "second_1234"):
+        queue["episodes"][f"youtube:all-in:{video_id}"] = downloader.new_episode_record(
+            config["shows"][0], {"video_id": video_id, "title": "Title"}, "2026-07-22T00:00:00Z"
+        )
+
+    class RecoveringSession:
+        def __init__(self) -> None:
+            self.restart_count = 0
+            self.calls = 0
+            self.closed = False
+
+        def open(self) -> None:
+            pass
+
+        def close(self) -> None:
+            self.closed = True
+
+        def restart(self) -> None:
+            self.restart_count += 1
+
+        def download(self, _episode: dict, destination: Path) -> None:
+            self.calls += 1
+            if self.calls == 1:
+                raise downloader.BrowserContextFailure("Target closed")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text("Transcript", encoding="utf-8")
+
+    session = RecoveringSession()
+
+    def fake_fetcher(url: str) -> str:
+        if url.endswith("/videos"):
+            return channel_html(("first__1234", "Title"))
+        return video_html("Title", "2026-07-17")
+
+    report = downloader.run_downloader(
+        config,
+        queue,
+        tmp_path / "queue.json",
+        tmp_path,
+        discover_only=False,
+        fetcher=fake_fetcher,
+        browser_session_factory=lambda *_args: session,
+    )
+
+    assert report.failed_downloads == 1
+    assert report.downloaded == 1
+    assert session.restart_count == 1
+    assert session.closed is True
+
+
 def test_failed_download_is_kept_for_retry(tmp_path: Path) -> None:
     config = sample_config()
     queue = downloader.empty_queue(config["shows"])

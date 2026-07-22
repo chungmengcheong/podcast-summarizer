@@ -148,14 +148,14 @@ Logic to be implemented in `downloader.py`
 2. for each episode in `queue.json` with `download == "pending"`
     1. retrieve its title and publication date if not already recorded
     2. generate the `youtube-transcript.io` URL with the episode's YouTube video ID
-    3. use the persistent Playwright browser to download the transcript
+    3. use one persistent Playwright browser context for the run, opening a fresh page to download each transcript
     4. validate that the downloaded file is non-empty, then move it to its final path
     5. record success or failure in the episode's `download` object
     6. pause for a randomized interval from three seconds through `request_pause_seconds` before the next attempt
 
 ### Download behavior
 
-The selected v1 route is the YouTube Transcript browser UI validated in the source spike. The downloader uses the dedicated persistent Chromium profile, starts visibly by default, and waits for human intervention if the site's supported anonymous-login flow cannot complete automatically. It saves the browser download directly to the final transcript path; it does not use the clipboard.
+The selected v1 route is the YouTube Transcript browser UI validated in the source spike. The downloader uses the dedicated persistent Chromium profile, starts visibly by default, and waits for human intervention if the site's supported anonymous-login flow cannot complete automatically. It opens the browser context once per queue run, uses a fresh page for each episode, and closes the context in a `finally` block. It saves the browser download directly to the final transcript path; it does not use the clipboard.
 
 `request_pause_seconds` is the configurable upper bound for a randomized pause after each completed download attempt. The downloader samples a duration between three seconds and the configured value (ten seconds by default). This is a conservative operating assumption, not a claim about the provider's rate limit.
 

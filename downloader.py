@@ -37,6 +37,10 @@ class ConfigurationError(ValueError):
     """Raised when the local configuration cannot be safely used."""
 
 
+class BrowserContextFailure(RuntimeError):
+    """A browser-level failure for which the shared session should be restarted."""
+
+
 @dataclass
 class RunReport:
     discovered: int = 0
@@ -362,27 +366,48 @@ def wait_for_transcript_access(page: Any, timeout_seconds: int) -> None:
     raise TimeoutError("No enabled transcript controls appeared.")
 
 
-def download_transcript(
-    episode: dict[str, Any],
-    output_path: Path,
-    browser_profile_dir: Path,
-    headless: bool,
-    timeout_seconds: int,
-) -> None:
-    """Download one transcript through the validated browser UI route."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    url = f"https://www.youtube-transcript.io/videos?id={episode['source_episode_id']}"
+class TranscriptBrowserSession:
+    """One persistent browser context, with a fresh page for each episode."""
 
-    with sync_playwright() as playwright:
-        context = playwright.chromium.launch_persistent_context(
-            user_data_dir=str(browser_profile_dir),
-            headless=headless,
+    def __init__(self, browser_profile_dir: Path, headless: bool, timeout_seconds: int):
+        self.browser_profile_dir = browser_profile_dir
+        self.headless = headless
+        self.timeout_seconds = timeout_seconds
+        self._playwright: Any | None = None
+        self._context: Any | None = None
+
+    def open(self) -> None:
+        if self._context is not None:
+            return
+        self._playwright = sync_playwright().start()
+        self._context = self._playwright.chromium.launch_persistent_context(
+            user_data_dir=str(self.browser_profile_dir),
+            headless=self.headless,
         )
-        page = context.pages[0] if context.pages else context.new_page()
+
+    def close(self) -> None:
+        if self._context is not None:
+            self._context.close()
+            self._context = None
+        if self._playwright is not None:
+            self._playwright.stop()
+            self._playwright = None
+
+    def restart(self) -> None:
+        self.close()
+        self.open()
+
+    def download(self, episode: dict[str, Any], output_path: Path) -> None:
+        """Download an episode while retaining the shared provider session."""
+        self.open()
+        assert self._context is not None
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        url = f"https://www.youtube-transcript.io/videos?id={episode['source_episode_id']}"
+        page = self._context.new_page()
         temporary_path: Path | None = None
         try:
-            page.goto(url, wait_until="domcontentloaded", timeout=timeout_seconds * 1000)
-            wait_for_transcript_access(page, timeout_seconds)
+            page.goto(url, wait_until="domcontentloaded", timeout=self.timeout_seconds * 1000)
+            wait_for_transcript_access(page, self.timeout_seconds)
 
             menu_button = page.locator('button[aria-haspopup="menu"]')
             if menu_button.count() != 1:
@@ -402,7 +427,7 @@ def download_transcript(
             if download_action.count() != 1:
                 raise RuntimeError("Could not identify the final transcript Download control.")
 
-            with page.expect_download(timeout=timeout_seconds * 1000) as download_info:
+            with page.expect_download(timeout=self.timeout_seconds * 1000) as download_info:
                 download_action.click()
             download = download_info.value
             with tempfile.NamedTemporaryFile(
@@ -419,10 +444,33 @@ def download_transcript(
             temporary_path = None
         except PlaywrightTimeoutError as error:
             raise RuntimeError(f"Timed out while downloading {episode['source_episode_id']}.") from error
+        except PlaywrightError as error:
+            message = str(error)
+            if any(
+                marker in message
+                for marker in ("Target page, context or browser has been closed", "Target closed", "Browser has been closed")
+            ):
+                raise BrowserContextFailure(message) from error
+            raise RuntimeError(f"Browser error while downloading {episode['source_episode_id']}: {message}") from error
         finally:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
-            context.close()
+            page.close()
+
+
+def download_transcript(
+    episode: dict[str, Any],
+    output_path: Path,
+    browser_profile_dir: Path,
+    headless: bool,
+    timeout_seconds: int,
+) -> None:
+    """Compatibility wrapper for one-off diagnostics and direct callers."""
+    session = TranscriptBrowserSession(browser_profile_dir, headless, timeout_seconds)
+    try:
+        session.download(episode, output_path)
+    finally:
+        session.close()
 
 
 def pending_downloads(queue: dict[str, Any]) -> list[dict[str, Any]]:
@@ -452,7 +500,8 @@ def run_downloader(
     config_root: Path,
     discover_only: bool,
     fetcher: Callable[[str], str] = fetch_text,
-    downloader: Callable[..., None] = download_transcript,
+    downloader: Callable[..., None] | None = None,
+    browser_session_factory: Callable[[Path, bool, int], Any] = TranscriptBrowserSession,
     sleeper: Callable[[float], None] = time.sleep,
     random_delay: Callable[[float, float], float] = random.uniform,
 ) -> RunReport:
@@ -480,45 +529,65 @@ def run_downloader(
     transcripts_dir = config_root / config["paths"]["transcripts_dir"]
     browser_profile_dir = config_root / config["paths"]["browser_profile_dir"]
     episodes_to_download = pending_downloads(queue)
-    for index, episode in enumerate(episodes_to_download):
-        download_state = episode["download"]
-        download_state["attempt_count"] += 1
-        download_state["last_attempt_at"] = utc_now()
-        download_state["last_error"] = None
-        write_json_atomically(queue_path, queue)
-        try:
-            enrich_episode_metadata(episode, fetcher)
-            destination = transcript_path_for_episode(transcripts_dir, episode)
-            downloader(
-                episode,
-                destination,
-                browser_profile_dir,
-                settings["headless"],
-                settings["page_timeout_seconds"],
-            )
-            episode["transcript_path"] = str(destination.relative_to(config_root))
-            download_state.update(
-                {
-                    "status": "succeeded",
-                    "completed_at": utc_now(),
-                    "last_error": None,
-                }
-            )
-            episode["summary"]["status"] = "pending"
-            report.downloaded += 1
-        except Exception as error:
-            download_state.update(
-                {
-                    "status": "failed",
-                    "completed_at": None,
-                    "last_error": str(error),
-                }
-            )
-            report.failed_downloads += 1
-        write_json_atomically(queue_path, queue)
+    browser_session: Any | None = None
+    try:
+        for index, episode in enumerate(episodes_to_download):
+            download_state = episode["download"]
+            download_state["attempt_count"] += 1
+            download_state["last_attempt_at"] = utc_now()
+            download_state["last_error"] = None
+            write_json_atomically(queue_path, queue)
+            try:
+                enrich_episode_metadata(episode, fetcher)
+                destination = transcript_path_for_episode(transcripts_dir, episode)
+                if downloader is not None:
+                    downloader(
+                        episode,
+                        destination,
+                        browser_profile_dir,
+                        settings["headless"],
+                        settings["page_timeout_seconds"],
+                    )
+                else:
+                    if browser_session is None:
+                        browser_session = browser_session_factory(
+                            browser_profile_dir,
+                            settings["headless"],
+                            settings["page_timeout_seconds"],
+                        )
+                        browser_session.open()
+                    browser_session.download(episode, destination)
+                episode["transcript_path"] = str(destination.relative_to(config_root))
+                download_state.update(
+                    {
+                        "status": "succeeded",
+                        "completed_at": utc_now(),
+                        "last_error": None,
+                    }
+                )
+                episode["summary"]["status"] = "pending"
+                report.downloaded += 1
+            except Exception as error:
+                download_state.update(
+                    {
+                        "status": "failed",
+                        "completed_at": None,
+                        "last_error": str(error),
+                    }
+                )
+                report.failed_downloads += 1
+                if isinstance(error, BrowserContextFailure) and browser_session is not None:
+                    try:
+                        browser_session.restart()
+                    except Exception as restart_error:
+                        download_state["last_error"] += f"; browser restart failed: {restart_error}"
+            write_json_atomically(queue_path, queue)
 
-        if index < len(episodes_to_download) - 1:
-            sleeper(random_delay(3, settings["request_pause_seconds"]))
+            if index < len(episodes_to_download) - 1:
+                sleeper(random_delay(3, settings["request_pause_seconds"]))
+    finally:
+        if browser_session is not None:
+            browser_session.close()
     return report
 
 
