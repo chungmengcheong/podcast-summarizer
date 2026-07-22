@@ -1,4 +1,4 @@
-# Requirements - Podcast Summarizer
+# Podcast Summarizer - product requirements
 
 ## User story
 
