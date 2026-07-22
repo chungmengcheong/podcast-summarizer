@@ -1,35 +1,49 @@
-# Podcast Summarizer - downloader plan and design notes 
+# Podcast Summarizer — downloader Plan and Design Notes
 
-## Sources
+This is a living record of decisions and system-design thinking. 
 
-**Podscripts**
+## Purpose
 
-All-in show page
-https://podscripts.co/podcasts/all-in-with-chamath-jason-sacks-friedberg/
+The downloader component discover episodes since the last successful check, add new source IDs/URLs to the queue, and retrieve transcripts. 
 
-All-in example episode
-https://podscripts.co/podcasts/all-in-with-chamath-jason-sacks-friedberg/more-trillion-dollar-ipos-anthropic-3t-zucks-price-war-china-ends-open-source-trump-accounts
+For context, see 'Working architecture hypothesis' section in `plan.md`. 
+
+## Input / Output contract
+
+**Input:**
+
+`config.json` stores for each show:
+- Show: e.g., "all-in-with-chamath-jason-sacks-friedberg")
+- Youtube_show_page: 'https://www.youtube.com/@allin/videos'
+- last_checked: date the show page was last checked for new episodes, e.g., "20260722"
+
+**Output:**
+
+1. A set of downloaded transcripts in `transcripts/`. Each file is named `<YYYYMMDD><Show Name><Episode title>.txt`, e.g.:
+
+```
+202607017-all-in-with-chamath-jason-sacks-friedberg-more-trillion-dollar-ipos-anthropic-3t-zucks-price-war-china-ends-open-source-trump-accounts.txt
+```
+
+2. `queue.json` which stores for each downloaded transcript:
+- youtube_ID: e.g., "9IMwRIei-Xc" 
+- download: status of successful downloading, i.e., {pending, success, failure} 
+- processed: status of successful summarization, i.e, {pending, completed}
 
 
-**YouTube**
+## Design decisions
 
-All-in show page
-https://www.youtube.com/playlist?list=PLn5MTSAqaf8peDZQ57QkJBzewJU1aUokl
 
-All-in example episode
-https://www.youtube.com/watch?v=PHL1j2ti420&list=PLn5MTSAqaf8peDZQ57QkJBzewJU1aUokl&index=2
+## Implementation notes
 
-Notes:
-- if youtube transcription is too difficult to parse, we can use the show ID and put into https://www.youtube-transcript.io/
+Logic to be implemented in `downloader.py`
 
-**Podchaser**
+### Dataflow
 
-All-in show page
-https://www.podchaser.com/podcasts/all-in-with-chamath-jason-sack-1057128
-
-All-in example episode
-https://www.podchaser.com/podcasts/all-in-with-chamath-jason-sack-1057128/episodes/the-trillion-dollar-industries-301653064/transcript
-
-Notes:
-- full transcripts seems to be only available for shows published greater than 7 days ago
-
+1. for each show in config.json
+    1. go to its Youtube page and identity the most recent episodes
+    2. append new episodes are not `queue.json` with `download = "pending"`
+2. for each episode in `queue.json` with `download == "pending"`
+    1. go to programmatically generated playwright URL with youtube video ID
+    2. download transcript
+    3. wait for respectful amount of time 
