@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "paths": {
+    "transcripts_dir": "transcripts",
+    "browser_profile_dir": ".playwright-profile/youtube-transcript"
+  },
+  "downloader": {
+    "headless": false,
+    "page_timeout_seconds": 120,
+    "request_pause_seconds": 10,
+    "max_new_episodes_per_show": 3
+  },
+  "shows": [
+    {
+      "id": "all-in",
+      "display_name": "All-In",
+      "youtube_videos_url": "https://www.youtube.com/@allin/videos",
+      "enabled": true
+    },
+    {
+      "id": "20vc",
+      "display_name": "20VC",
+      "youtube_videos_url": "https://www.youtube.com/@20VC/videos",
+      "enabled": true
+    }
+  ]
+}

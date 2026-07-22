@@ -1,0 +1,17 @@
+[project]
+name = "podcast-summarizer"
+version = "0.1.0"
+description = "Personal CLI for downloading podcast transcripts and producing summaries"
+requires-python = ">=3.12"
+dependencies = [
+  "playwright==1.61.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

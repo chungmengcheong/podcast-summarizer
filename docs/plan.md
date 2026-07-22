@@ -13,6 +13,7 @@ Automatic scheduling and Instapaper delivery are deferred increments.
 The source adapter, summarizer, storage/state, and delivery steps should be separate modules. 
 The CLI orchestrates them; it should not contain source-specific scraping or prompt logic.
 
+```
 User or scheduler
     |
     | config.json: shows and provider URLs
@@ -34,7 +35,7 @@ post_processor.py   create one collated Markdown reading file
     |
     V
   (end)
-
+```
 
 ## Decisions made
 

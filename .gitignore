@@ -1,0 +1,21 @@
+# Python environment and test artifacts
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local downloader runtime data
+.playwright-profile/
+transcripts/
+queue.json
+.queue.json.*.tmp
+
+# Optional Playwright artifacts, if enabled later
+test-results/
+playwright-report/
+blob-report/
+
+# macOS
+.DS_Store

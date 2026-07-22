@@ -187,10 +187,24 @@ A failed download remains retryable on the next run. `attempt_count`, `last_atte
    `/watch?v=<video-id>` links, including the supplied representative video.
    The browser diagnostic successfully exercised its transcript Copy and
    Download controls for `HoRaqNWKcpM`.
-2. Decide the initial command contract. Recommended: `python downloader.py
-   --config config.json`; it discovers and downloads in one run, while
-   `--discover-only` allows inspection of the queue without browser work.
-3. Add an empty `config.json` based on the contract above and an empty
-   `queue.json` based on its initial-state example. The downloader should
-   create `transcripts/` if absent and write JSON by replacing a temporary file
-   in the same directory, so an interrupted run does not leave a partial queue.
+2. **Complete:** `python downloader.py --config config.json` discovers and
+   downloads in one run. `--discover-only` updates and reports the queue
+   without opening the browser.
+3. **Complete:** The repository supplies `config.json` and `queue.json`; an
+   initial queue has no episodes. The downloader creates `transcripts/` if
+   absent and writes JSON by replacing a temporary file in the same directory,
+   so an interrupted run does not leave a partial queue.
+
+## Commands
+
+```text
+uv sync --group dev
+uv run pytest -q
+uv run python downloader.py --config config.json --discover-only
+uv run python downloader.py --config config.json
+```
+
+The first full run will attempt the six currently queued episodes: the latest
+three discovered for All-In and the latest three for 20VC. The visible browser
+window may require intervention if the provider's anonymous session has
+expired.
