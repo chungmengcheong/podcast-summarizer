@@ -12,8 +12,9 @@ As a busy but interested person, I want transcripts of new episodes of podcast s
 3. Tool generates markdown summaries from the downloaded transcripts. e.g., `All_In-20260327-Summary-Anthropic's Generational Run, OpenAI Panics, AI Moats, Meta Loses Major Lawsuits.md`
 4. Summaries are collated into a single markdown file, e.g., `20260327-summaries.md`
 5. The collated summary is copied into the user's Obsidian folder.
-6. The episodes' full transcripts and summaries are moved into folders, categorized by show, e.g, 'All_In/, 20VC/'
-7. Command-line tool finish with summary of operations 
+6. The episodes' raw transcripts, scrubbed transcripts, and individual summaries remain in their existing local folders for provenance and reruns.
+7. The tool makes a best-effort Instapaper reminder for the collated file; a failed reminder is reported but does not invalidate Obsidian delivery.
+8. Command-line tool finishes with a summary of operations.
 
 
 ## Core functionality and characteristics
@@ -26,7 +27,7 @@ As a busy but interested person, I want transcripts of new episodes of podcast s
 
 **Show and history tracker:** A simple JSON format tracks monitored shows, each source's last successful check, and a queue of discovered episodes. Each queued episode has a stable source ID or URL and a processing status (for example: discovered, downloaded, summarized, or failed). This is the standing v1 hypothesis, to be validated during implementation.
 
-**Instapaper:** User has an existing Instapaper account
+**Instapaper:** User has an existing Instapaper account. The tool uses credentials stored outside version control to create a stub reminder after a successful Obsidian delivery. This is non-blocking: a failure is visible to the user but does not cause the collated file to be redelivered.
 
 **Obsidian delivery:** The collated Markdown file is copied to a configured folder in the user's Obsidian vault. The destination must be configurable rather than hard-coded.
 
@@ -57,7 +58,6 @@ v1 does not need:
 - web UI
 - account system
 - automatic scheduling
-- Instapaper delivery
 - fallback to alternative sources for transcripts
  
  

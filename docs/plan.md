@@ -4,9 +4,9 @@ This is a living record of decisions and system-design thinking. It is intention
 
 ## Product boundary for v1
 
-A manual Python command-line tool checks All-In and 20VC for episodes published since its last successful source check, queues newly discovered episodes, downloads and normalizes transcripts from one selected transcript source, produces an editable-template Markdown summary for each normalized episode, creates a collated Markdown reading file, copies that file to a configured Obsidian-vault folder, organizes local artifacts by show, and reports successes and failures.
+A manual Python command-line tool checks All-In and 20VC for episodes published since its last successful source check, queues newly discovered episodes, downloads and normalizes transcripts from one selected transcript source, produces an editable-template Markdown summary for each normalized episode, creates a collated Markdown reading file, copies that file to a configured Obsidian-vault folder, optionally creates an Instapaper reminder, and reports successes and failures. Raw, scrubbed, and per-episode summary artifacts remain in their current folders.
 
-Automatic scheduling and Instapaper delivery are deferred increments.
+Automatic scheduling is a deferred increment. Instapaper is a best-effort, non-blocking reminder: its failure is reported but does not undo a successful Obsidian delivery.
 
 ## Working architecture hypothesis
 
@@ -34,8 +34,8 @@ Summarizer.py  take queued normalized transcripts and invoke the selected local 
     |  summary.md for each episode 
     V
 post_processor.py   create one collated Markdown reading file
-    |                archive transcripts and summaries for each episode
     |                move collated Markdown reading file to Obsidian
+    |                create a non-blocking Instapaper reminder
     |
     V
   (end)
@@ -53,16 +53,15 @@ post_processor.py   create one collated Markdown reading file
 | Discovery and processing state | Track each source's last successful check plus an episode queue keyed by source ID/URL and lifecycle status | Separates discovery from summarization, supports retries, and prevents duplicate work. This is a standing v1 hypothesis to validate. |
 | Transcript normalization | Keep the downloaded raw transcript and create a separate scrubbed transcript before summarization | Source formatting should not leak into the prompt, while retaining the original makes scraper changes inspectable and re-runnable. |
 | Failure handling | Continue processing other episodes; save/report failures for a later retry | A single bad page must not hide successful work. |
-| Delivery | Copy collated Markdown to a configured Obsidian-vault folder | Produces a durable, inspectable reading artifact without external-account integration. |
+| Delivery | Copy collated Markdown to a configured Obsidian-vault folder and make a best-effort Instapaper reminder | Obsidian is the durable, inspectable reading artifact; Instapaper is a convenient alert and never blocks delivery. |
+| Local artifacts | Keep raw, scrubbed, and per-episode summary files in their existing folders | Preserves provenance and makes every earlier stage inspectable and re-runnable. |
 
 ## Proposed implementation increments
 
 1. **Single-source ingestion:** Discover and download one new transcript per supported show; persist normalized metadata and local files. Completed for All-In and 20VC.
 2. **Transcript normalization:** Given a downloaded raw transcript, create and persist a scrubbed transcript using deterministic, source-aware formatting rules. Add unit tests for every observed source format.
 3. **Local summarization:** Given a scrubbed transcript file, generate a summary file using the editable prompt/template. No additional scraping or Obsidian copy.
-4. **End-to-end run:** Add full multi-episode lifecycle handling, artifact organization, a collated reading file, Obsidian copy, and a clear run report.
+4. **Post-processing and delivery:** Add full multi-episode delivery-state handling, a collated reading file, Obsidian copy, a best-effort Instapaper reminder, and a clear run report. Keep local artifacts in their existing folders.
 5. **Reliability pass:** Add per-episode error records, safe retries on later runs, and tests around state and file organization.
 6. **Scheduling:** Add a Mac-appropriate scheduled invocation once the manual command is trusted.
-7. **Optional Instapaper delivery:** Investigate and add it as a separate integration, if still useful after the Obsidian workflow is established.
-
 

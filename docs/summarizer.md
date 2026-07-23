@@ -69,10 +69,10 @@ The headings and field labels below are part of the contract. A point may omit t
 
 ## Hot takes
 
-### 1. Hot take: {{ short claim }}
+### 1. {{ short claim }}
 
-- **What was asserted:** {{ the intriguing but unsupported claim made in the discussion }}
-- **What is missing:** {{ evidence, reasoning, or a test that would substantiate or disprove it }}
+- **Asserted:** {{ the intriguing but unsupported claim made in the discussion }}
+- **Missing:** {{ evidence, reasoning, or a test that would substantiate or disprove it }}
 ```
 
 ## Prompt for the local AI CLI

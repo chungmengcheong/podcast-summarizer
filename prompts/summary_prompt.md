@@ -31,9 +31,9 @@ For every point use this structure:
 ### <number>. <short, specific title>
 
 - **Claim:** <a material development or assertion>
-- **Logic chain:** 
-+ <premise or observation stated in the discussion> (<supporting evidence>) 
-+ <premise or observation stated in the discussion> (<supporting evidence>) 
+- **Thesis:** 
++ <reasoning, premise, or observation stated in the discussion> (<supporting evidence>) 
++ <reasoning, premise, or observation stated in the discussion> (<supporting evidence>) 
 + <...> 
 + --> <conclusion stated in the discussion> (<supporting evidence>) 
 + --> <if any implication, forecast, or recommendation stated in the discussion>. 

@@ -19,6 +19,10 @@
     "max_input_characters": 200000,
     "prompt_path": "prompts/summary_prompt.md"
   },
+  "post_processor": {
+    "obsidian_target_dir": "/Users/ccm/Library/Mobile Documents/iCloud~md~obsidian/Documents/Notes/z_to_read",
+    "instapaper_url": "http://www.nourl.com"
+  },
   "shows": [
     {
       "id": "all-in",
