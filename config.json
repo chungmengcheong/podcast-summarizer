@@ -35,6 +35,18 @@
       "display_name": "20VC",
       "youtube_videos_url": "https://www.youtube.com/@20VC/videos",
       "enabled": true
+    },
+    {
+      "id": "iltb",
+      "display_name": "Invest Like the Best",
+      "youtube_videos_url": "https://www.youtube.com/@ILTB_Podcast/videos",
+      "enabled": true
+    },
+    {
+      "id": "lennys",
+      "display_name": "Lenny's Podcast",
+      "youtube_videos_url": "https://www.youtube.com/@LennysPodcast/videos",
+      "enabled": true
     }
   ]
 }
