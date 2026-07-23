@@ -66,22 +66,3 @@ post_processor.py   create one collated Markdown reading file
 7. **Optional Instapaper delivery:** Investigate and add it as a separate integration, if still useful after the Obsidian workflow is established.
 
 
-## Architecture spike
-
-The spike will test the uncertain pieces before we commit to implementation:
-
-Sourcing transcripts
-1. Inspect real All-In and 20VC show/episode pages across the candidate transcript sources.
-2. Determine whether each candidate supports dependable episode discovery, a stable transcript extraction path, usable metadata, and sufficient coverage for both shows.
-3. Select one source and document its page patterns, identifiers, and expected failure modes.
-4. Confirm a minimal Playwright-based retrieval approach works on a representative episode from each show.
-
-**Exit criteria:** one source can reliably produce saved transcripts for one representative episode from each initial show
-
-## Open decisions to resolve during the spike
-
-- Which transcript source is the best fit for both All-In and 20VC?
-- Is browser automation actually required for the chosen source, or is a simpler permitted extraction path available?
-- Which locally installed CLI will be the initial summarizer, and what invocation contract can the tool rely on?
-- What exact configurable paths should hold working files, the organized archive, and the Obsidian reading file?
-- How should very long transcripts be handled if they exceed the summarizer's practical context limit?

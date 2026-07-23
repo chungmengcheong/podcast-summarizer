@@ -1,4 +1,4 @@
-## Transcript normalization 
+# Podcast Summarizer — raw transcript normalization Plan and Design Notes
 
 `transcript_scrubber.py` receives a downloaded raw `.txt` transcript and writes
 a separate scrubbed `.txt` file. The raw file remains the source record; the
