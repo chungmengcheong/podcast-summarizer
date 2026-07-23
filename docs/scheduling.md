@@ -26,10 +26,10 @@ From the repository root, run:
 ./scripts/install-launchd.sh
 ```
 
-The installer copies the tracked LaunchAgent to
-`~/Library/LaunchAgents/com.ccm.podcast-summarizer.plist`, loads it for the
-current macOS login session, and enables it. No run is triggered during
-installation. To verify the job is registered:
+The installer substitutes your local repository path into the tracked template,
+then writes it to `~/Library/LaunchAgents/com.ccm.podcast-summarizer.plist`,
+loads it for the current macOS login session, and enables it. No run is
+triggered during installation. To verify the job is registered:
 
 ```text
 launchctl print gui/$(id -u)/com.ccm.podcast-summarizer
@@ -57,7 +57,7 @@ runs, changing `config.json` to `headless: true` is the next practical test.
 
 ## Change or remove
 
-The tracked plist is the schedule source of truth. Its `Weekday: 5`,
+The tracked plist template is the schedule source of truth. Its `Weekday: 5`,
 `Hour: 15`, and `Minute: 0` mean Friday at 3:00 p.m. in the Mac's configured
 local time zone (Pacific time on this Mac). Edit those values, then rerun the
 installer to reload the job. To stop and remove the installed job:

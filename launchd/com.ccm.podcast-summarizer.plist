@@ -6,10 +6,10 @@
   <string>com.ccm.podcast-summarizer</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/ccm/Documents/projects/podcast-summarizer/scripts/run-scheduled-poddigest.sh</string>
+    <string>__PODDIGEST_REPOSITORY__/scripts/run-scheduled-poddigest.sh</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/Users/ccm/Documents/projects/podcast-summarizer</string>
+  <string>__PODDIGEST_REPOSITORY__</string>
   <key>StartCalendarInterval</key>
   <dict>
     <key>Weekday</key>
@@ -20,9 +20,9 @@
     <integer>0</integer>
   </dict>
   <key>StandardOutPath</key>
-  <string>/Users/ccm/Documents/projects/podcast-summarizer/logs/launchd/stdout.log</string>
+  <string>__PODDIGEST_REPOSITORY__/logs/launchd/stdout.log</string>
   <key>StandardErrorPath</key>
-  <string>/Users/ccm/Documents/projects/podcast-summarizer/logs/launchd/stderr.log</string>
+  <string>__PODDIGEST_REPOSITORY__/logs/launchd/stderr.log</string>
   <key>ProcessType</key>
   <string>Background</string>
 </dict>
