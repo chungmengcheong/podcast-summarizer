@@ -19,7 +19,6 @@ from transcript_scrubber import write_text_atomically
 
 
 REQUIRED_HEADINGS = (
-    "## Episode metadata",
     "## Executive takeaway",
     "## Key points",
     "## Hot takes",
@@ -146,12 +145,7 @@ def validate_summary(markdown: str) -> str | None:
     if heading_positions != sorted(heading_positions):
         return "Required summary headings are out of order."
 
-    metadata_start, takeaway_start, key_points_start, hot_takes_start = heading_positions
-    metadata_lines = lines[metadata_start + 1 : takeaway_start]
-    for field_name in ("Show", "Published", "Source URL", "Transcript source"):
-        if not any(line.startswith(f"- {field_name}:") for line in metadata_lines):
-            return f"Episode metadata is missing '{field_name}'."
-
+    takeaway_start, key_points_start, hot_takes_start = heading_positions
     key_point_lines = lines[key_points_start + 1 : hot_takes_start]
     if not any(KEY_POINT_HEADING.match(line) for line in key_point_lines):
         return "Summary must contain at least one numbered key point."
@@ -209,10 +203,7 @@ def scrubbed_path_for_episode(config_root: Path, episode: dict[str, Any]) -> Pat
 
 def summary_path_for_episode(config_root: Path, config: dict[str, Any], episode: dict[str, Any]) -> Path:
     transcript_path = scrubbed_path_for_episode(config_root, episode)
-    show_id = episode.get("show_id")
-    if not isinstance(show_id, str) or not show_id:
-        raise SummarizerError("Episode has no show_id.")
-    return config_root / config["paths"]["summaries_dir"] / show_id / f"{transcript_path.stem}-summary.md"
+    return config_root / config["paths"]["summaries_dir"] / f"{transcript_path.stem}-summary.md"
 
 
 def run_summarizer(

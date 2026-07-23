@@ -2,7 +2,7 @@
   "version": 1,
   "paths": {
     "transcripts_dir": "transcripts",
-    "summaries_dir": "summaries",
+    "summaries_dir": "transcripts/summarized",
     "browser_profile_dir": ".playwright-profile/youtube-transcript"
   },
   "downloader": {

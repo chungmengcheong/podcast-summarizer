@@ -35,13 +35,12 @@ As a busy but interested person, I want transcripts of new episodes of podcast s
 
 Each episode summary is a Markdown file with:
 
-- Episode metadata: show, title, publication date, source URL, and transcript source.
-- Executive takeaway: summary of the main theses/questions explored and conclusions.
-- Key points: the top 3-7 news, claims, and conclusions synthesized as:
-  - Point 1: news, claim, or conclusion.
-    - Logic chain: A (with supporting evidence) → B (with supporting evidence) → claim or conclusion (with supporting evidence) → implications X and Y.
-    - Areas of notable disagreement between podcast guests: the differing claim, logic, or evidence.
-- Hot takes: top 1-3 novel but unsubstantiated observations. Label each explicitly as an inference and state the discussion evidence or reasoning that prompted it.
+- Title: show and episode title in the H1 heading. Queue metadata remains tool-owned provenance and is not rendered in the summary.
+- Executive takeaway: two to four sentences on the main thesis or question, the most useful answer offered, and any material uncertainty.
+- Key points: normally three to five material news items, claims, or conclusions. Each includes a claim; a logic chain that places concrete evidence immediately after the step it supports; and any material disagreement. The chain may include an implication, forecast, or recommendation only when a participant stated or clearly argued it.
+- Hot takes: zero to three intriguing assertions or speculative ideas made in the podcast but not adequately substantiated there. Each records what was asserted and what evidence, reasoning, or test is missing. The summarizer does not create its own hot takes or inferences.
+
+Summaries target 400–800 words. The exact editable instructions live in `prompts/summary_prompt.md`.
 
 The exact prompt and template are stored in editable local files so the user can tune the balance of business, technical, or other detail.
 
