@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable
+from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
 from playwright.sync_api import Error as PlaywrightError
@@ -31,6 +32,8 @@ from playwright.sync_api import sync_playwright
 
 YOUTUBE_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
 TRANSCRIPT_SOURCE = "youtube-transcript-ui"
+USER_INJECTED_SHOW_ID = "user-injected"
+USER_INJECTED_DISPLAY_NAME = "User-injected"
 
 
 class ConfigurationError(ValueError):
@@ -246,11 +249,13 @@ def extract_youtube_videos(page_html: str) -> list[dict[str, str]]:
 
 
 def extract_youtube_metadata(page_html: str) -> dict[str, str | None]:
-    """Extract the stable title and ISO publication date from a video page."""
+    """Extract stable title, date, and channel display name from a video page."""
     player_response = extract_assigned_json(page_html, "ytInitialPlayerResponse")
     video_details = player_response.get("videoDetails")
     microformat = player_response.get("microformat", {}).get("playerMicroformatRenderer", {})
     title = video_details.get("title") if isinstance(video_details, dict) else None
+    author = video_details.get("author") if isinstance(video_details, dict) else None
+    owner_name = microformat.get("ownerChannelName") if isinstance(microformat, dict) else None
     raw_published_at = microformat.get("publishDate") if isinstance(microformat, dict) else None
     published_at_match = (
         re.match(r"\d{4}-\d{2}-\d{2}", raw_published_at)
@@ -260,11 +265,36 @@ def extract_youtube_metadata(page_html: str) -> dict[str, str | None]:
     return {
         "title": html.unescape(title) if isinstance(title, str) else None,
         "published_at": published_at_match.group(0) if published_at_match else None,
+        "show_display_name": html.unescape(author)
+        if isinstance(author, str)
+        else html.unescape(owner_name)
+        if isinstance(owner_name, str)
+        else None,
     }
 
 
 def episode_key(show_id: str, video_id: str) -> str:
     return f"youtube:{show_id}:{video_id}"
+
+
+def parse_youtube_video_url(value: str) -> tuple[str, str]:
+    """Validate a supported YouTube episode URL and return ID plus canonical URL."""
+    parsed = urlparse(value.strip())
+    host = parsed.netloc.lower().removeprefix("www.")
+    path_parts = [part for part in parsed.path.split("/") if part]
+    video_id: str | None = None
+
+    if host == "youtu.be" and path_parts:
+        video_id = path_parts[0]
+    elif host in {"youtube.com", "m.youtube.com"}:
+        if parsed.path == "/watch":
+            video_id = parse_qs(parsed.query).get("v", [None])[0]
+        elif len(path_parts) >= 2 and path_parts[0] in {"shorts", "live", "embed"}:
+            video_id = path_parts[1]
+
+    if not isinstance(video_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{6,}", video_id):
+        raise ValueError("--add-episode must be a supported YouTube video URL.")
+    return video_id, f"https://www.youtube.com/watch?v={video_id}"
 
 
 def new_episode_record(show: dict[str, Any], video: dict[str, str], discovered_at: str) -> dict[str, Any]:
@@ -300,6 +330,28 @@ def new_episode_record(show: dict[str, Any], video: dict[str, str], discovered_a
             "last_error": None,
         },
     }
+
+
+def queue_user_injected_episode(
+    queue: dict[str, Any], url: str, added_at: str | None = None
+) -> tuple[dict[str, Any], bool]:
+    """Add one manually chosen YouTube episode without changing monitored shows."""
+    video_id, canonical_url = parse_youtube_video_url(url)
+    key = episode_key(USER_INJECTED_SHOW_ID, video_id)
+    for existing in queue["episodes"].values():
+        if isinstance(existing, dict) and existing.get("source_episode_id") == video_id:
+            return existing, False
+
+    show = {"id": USER_INJECTED_SHOW_ID}
+    episode = new_episode_record(
+        show,
+        {"video_id": video_id, "title": "Manually added episode"},
+        added_at or utc_now(),
+    )
+    episode["source_url"] = canonical_url
+    episode["show_display_name"] = USER_INJECTED_DISPLAY_NAME
+    queue["episodes"][key] = episode
+    return episode, True
 
 
 def stage_state(status: str) -> dict[str, Any]:
@@ -538,6 +590,8 @@ def enrich_episode_metadata(episode: dict[str, Any], fetcher: Callable[[str], st
         episode["title"] = metadata["title"]
     if metadata["published_at"]:
         episode["published_at"] = metadata["published_at"]
+    if episode.get("show_id") == USER_INJECTED_SHOW_ID and metadata["show_display_name"]:
+        episode["show_display_name"] = metadata["show_display_name"]
     if not episode.get("published_at"):
         raise ValueError("YouTube video page did not supply an ISO publication date.")
 
@@ -641,7 +695,7 @@ def run_downloader(
     return report
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Discover and download podcast transcripts.")
     parser.add_argument("--config", type=Path, required=True, help="Path to config.json.")
     parser.add_argument("--queue", type=Path, help="Path to queue.json (default: next to config).")
@@ -650,16 +704,31 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Update the queue with newly discovered episodes without opening the browser.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--add-episode",
+        help="Queue one YouTube episode without discovery or download.",
+    )
+    args = parser.parse_args(argv)
+    if args.add_episode and args.discover_only:
+        parser.error("--add-episode cannot be combined with --discover-only.")
+    return args
 
 
-def main() -> int:
-    args = parse_args()
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     config_path = args.config.resolve()
     try:
         config = load_config(config_path)
         queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
         queue = load_queue(queue_path, config["shows"])
+        if args.add_episode:
+            episode, added = queue_user_injected_episode(queue, args.add_episode)
+            if added:
+                write_json_atomically(queue_path, queue)
+                print(f"Queued: {episode['source_url']}")
+            else:
+                print(f"Already queued: {episode['source_url']}")
+            return 0
         report = run_downloader(
             config,
             queue,
@@ -667,7 +736,7 @@ def main() -> int:
             config_path.parent,
             args.discover_only,
         )
-    except (ConfigurationError, OSError) as error:
+    except (ConfigurationError, OSError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 

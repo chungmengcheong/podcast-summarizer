@@ -110,12 +110,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--queue", type=Path, help="Path to queue.json (default: next to config).")
     parser.add_argument("--stage", choices=STAGES, help="Run only one workflow stage.")
     parser.add_argument("--discover-only", action="store_true", help="Discover episodes without downloading them.")
+    parser.add_argument("--add-episode", help="Queue one YouTube episode without running workflow stages.")
     parser.add_argument("--force", action="store_true", help="Recreate successful scrub or summary artifacts in the selected stage.")
     parser.add_argument("--verbose", action="store_true", help="Show component start, outcome, and concise diagnostics.")
     parser.add_argument("--no-live", action="store_true", help="Use append-only progress output instead of terminal redraws.")
     args = parser.parse_args(argv)
-    if args.discover_only and (args.stage or args.force):
-        parser.error("--discover-only cannot be combined with --stage or --force.")
+    if args.discover_only and (args.stage or args.force or args.add_episode):
+        parser.error("--discover-only cannot be combined with --stage, --force, or --add-episode.")
+    if args.add_episode and (args.stage or args.force):
+        parser.error("--add-episode cannot be combined with --stage or --force.")
     if args.force and args.stage not in {"scrub", "summarize"}:
         parser.error("--force requires --stage scrub or --stage summarize.")
     return args
@@ -201,6 +204,34 @@ def run_workflow(
             diagnostics.write(f"Configuration error: {message}\n")
         reporter.finish("could not complete", logger.path)
         return 2
+
+    if args.add_episode:
+        logger.write("queue add started")
+        try:
+            episode, added = downloader.queue_user_injected_episode(queue, args.add_episode)
+        except ValueError as error:
+            message = safe_message(error)
+            logger.write(f"queue add errored: {message}")
+            logger.write("run could not complete: exit_code=2")
+            if args.verbose:
+                diagnostics.write(f"Queue add error: {message}\n")
+            reporter.finish("could not complete", logger.path)
+            return 2
+
+        if added:
+            downloader.write_json_atomically(queue_path, queue)
+            message = f"Queued: {episode['source_url']}"
+            key = downloader.episode_key(episode["show_id"], episode["source_episode_id"])
+            logger.write(f"queue add completed: status=queued episode_key={key}")
+        else:
+            message = f"Already queued: {episode['source_url']}"
+            key = downloader.episode_key(episode["show_id"], episode["source_episode_id"])
+            logger.write(f"queue add completed: status=already-queued episode_key={key}")
+        output.write(f"{message}\n")
+        output.flush()
+        logger.write("run completed: exit_code=0")
+        reporter.finish("completed", logger.path)
+        return 0
 
     state = RunState()
     stage_functions = {

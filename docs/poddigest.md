@@ -38,13 +38,18 @@ It defaults to `config.json` and its sibling `queue.json`.
 ```text
 uv run python poddigest.py [--config PATH] [--queue PATH]
                             [--stage download|scrub|summarize|delivery]
-                            [--discover-only] [--force] [--verbose] [--no-live]
+                            [--discover-only | --add-episode YOUTUBE_URL]
+                            [--force] [--verbose] [--no-live]
 ```
 
 - Without `--stage`, run all four stages in order.
 - With `--stage`, run only that stage; prerequisites are not run implicitly.
 - `--discover-only` discovers episodes and exits. It is mutually exclusive
   with `--stage` and `--force`.
+- `--add-episode YOUTUBE_URL` validates and queues one manually chosen YouTube
+  episode, then exits without discovery or processing. It is mutually
+  exclusive with `--discover-only`, `--stage`, and `--force`. It is intended
+  for one-off episodes outside the monitored shows.
 - `--force` requires `--stage scrub` or `--stage summarize`. It recreates
   successful artifacts only for the explicitly selected stage. It is invalid
   without a stage and never redelivers a completed batch.
@@ -58,6 +63,20 @@ The orchestrator deliberately does not mirror every component option. Options
 that change internals (browser headlessness, timeout, prompt, destination) stay
 in `config.json`; duplicating them on the orchestrator would create conflicting
 precedence rules.
+
+### One-off episode injection
+
+For an episode from a show that is not monitored, use:
+
+```text
+uv run python poddigest.py --add-episode "https://youtu.be/<video-id>"
+```
+
+The command accepts standard YouTube watch, short-link, Shorts, Live, and
+embed URLs; normalizes the source URL; and atomically creates a pending queue
+record. A repeated video ID reports `Already queued` and preserves its existing
+lifecycle state. It does not create a configured show or alter monitored-show
+discovery state. Run ordinary `poddigest.py` later to process the queued item.
 
 ## Progress display and final report
 

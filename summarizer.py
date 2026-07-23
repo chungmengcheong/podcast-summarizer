@@ -14,7 +14,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from downloader import ConfigurationError, load_config, load_queue, stage_state, utc_now, write_json_atomically
+from downloader import (
+    USER_INJECTED_SHOW_ID,
+    ConfigurationError,
+    load_config,
+    load_queue,
+    stage_state,
+    utc_now,
+    write_json_atomically,
+)
 from transcript_scrubber import write_text_atomically
 
 
@@ -86,11 +94,15 @@ def episode_metadata(config: dict[str, Any], episode: dict[str, Any]) -> dict[st
     """Return authoritative output metadata from the queue and user config."""
     show_id = episode.get("show_id")
     show = next((item for item in config["shows"] if item["id"] == show_id), None)
-    if show is None:
+    if show is not None:
+        show_display_name = show["display_name"]
+    elif show_id == USER_INJECTED_SHOW_ID and isinstance(episode.get("show_display_name"), str):
+        show_display_name = episode["show_display_name"]
+    else:
         raise SummarizerError(f"Episode has an unknown show_id: {show_id!r}.")
 
     values = {
-        "show": show["display_name"],
+        "show": show_display_name,
         "title": episode.get("title"),
         "published_at": episode.get("published_at") or "Unknown",
         "source_url": episode.get("source_url"),

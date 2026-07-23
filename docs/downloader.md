@@ -4,7 +4,7 @@ This is a living record of decisions and system-design thinking.
 
 ## Purpose
 
-The downloader component discovers episodes, records newly seen source IDs/URLs in the queue, and retrieves their transcripts.
+The downloader component discovers episodes, records newly seen source IDs/URLs in the queue, accepts one-off YouTube episodes, and retrieves transcripts.
 
 For context, see 'Working architecture hypothesis' section in `plan.md`. 
 
@@ -144,6 +144,31 @@ After a successful discovery and download, it has this shape:
 
 The key is `source:show-id:source-episode-id`; the same three values are also stored inside the record to keep the file readable and independently recoverable. `published_at` may be `null` if YouTube does not supply it during the initial discovery pass; it must be filled before the final transcript file is named.
 
+### One-off YouTube episodes
+
+`--add-episode <youtube-url>` is a queue-only operation for episodes from
+shows that are not monitored. It accepts standard watch, short-link, Shorts,
+Live, and embed video URLs, normalizes them to a canonical watch URL, and
+creates this record shape:
+
+```json
+{
+  "show_id": "user-injected",
+  "show_display_name": "User-injected",
+  "source_episode_id": "<youtube-video-id>",
+  "source_url": "https://www.youtube.com/watch?v=<youtube-video-id>",
+  "title": "Manually added episode",
+  "published_at": null
+}
+```
+
+The normal download step fills title and publication date, and uses the
+YouTube channel name as `show_display_name` when it is present. The queue key
+is `youtube:user-injected:<youtube-video-id>`. A video ID already present in
+the queue—whether injected or monitored—leaves the existing record, including
+its retry state, unchanged. This sentinel show is not
+added to `queue.shows`, because it has no channel cursor or discovery process.
+
 ## Design decisions
 
 Logic to be implemented in `downloader.py`
@@ -163,6 +188,9 @@ Logic to be implemented in `downloader.py`
     5. record success or failure in the episode's `download` object
     6. mark `scrub.status = "pending"`; `summary` remains `not_ready` until scrubbing succeeds
     7. pause for a randomized interval from three seconds through `request_pause_seconds` before the next attempt
+
+Manual injection bypasses the discovery loop entirely; it only creates the
+same pending-download record that discovery would create.
 
 ### Download behavior
 
@@ -213,6 +241,7 @@ A failed download or scrub remains retryable on the next run of its respective c
 uv sync --group dev
 uv run pytest -q
 uv run python downloader.py --config config.json --discover-only
+uv run python downloader.py --config config.json --add-episode "https://youtu.be/<video-id>"
 uv run python downloader.py --config config.json
 uv run python transcript_scrubber.py --config config.json
 ```

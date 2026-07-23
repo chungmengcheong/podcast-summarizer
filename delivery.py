@@ -152,8 +152,11 @@ def load_dotenv_values(path: Path) -> dict[str, str]:
 
 def instapaper_credentials(config_root: Path) -> tuple[str, str]:
     values = load_dotenv_values(config_root / ".env")
-    username = os.environ.get("INSTAPAPER_USERNAME") or values.get("INSTAPAPER_USERNAME")
-    password = os.environ.get("INSTAPAPER_PASSWORD") or values.get("INSTAPAPER_PASSWORD")
+    # A repository-local .env is the normal user-owned configuration. The
+    # environment remains a useful fallback for scheduled invocations, but
+    # must not silently replace a deliberate project-specific setting.
+    username = values.get("INSTAPAPER_USERNAME") or os.environ.get("INSTAPAPER_USERNAME")
+    password = values.get("INSTAPAPER_PASSWORD") or os.environ.get("INSTAPAPER_PASSWORD")
     if not username or not password:
         raise DeliveryError("Instapaper credentials are missing from .env or the environment.")
     return username, password

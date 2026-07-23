@@ -65,7 +65,11 @@ def test_pending_deliveries_is_newest_first_and_excludes_delivered() -> None:
     assert delivery.pending_deliveries(queue) == [newest, oldest]
 
 
-def test_run_delivery_delivers_one_newest_first_batch_and_marks_queue(tmp_path: Path) -> None:
+def test_run_delivery_delivers_one_newest_first_batch_and_marks_queue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("INSTAPAPER_USERNAME", "ambient-user")
+    monkeypatch.setenv("INSTAPAPER_PASSWORD", "ambient-password")
     obsidian_dir = tmp_path / "obsidian"
     config = sample_config(obsidian_dir)
     oldest = episode("old", "2026-07-15", write_summary(tmp_path, "old.md", "Old summary"))

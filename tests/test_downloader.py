@@ -25,9 +25,9 @@ def channel_html(*videos: tuple[str, str]) -> str:
     return f"<script>var ytInitialData = {json.dumps({'contents': {'richGridRenderer': {'contents': contents}}})};</script>"
 
 
-def video_html(title: str, published_at: str) -> str:
+def video_html(title: str, published_at: str, author: str | None = None) -> str:
     data = {
-        "videoDetails": {"title": title},
+        "videoDetails": {"title": title, "author": author},
         "microformat": {"playerMicroformatRenderer": {"publishDate": published_at}},
     }
     return f"<script>var ytInitialPlayerResponse = {json.dumps(data)};</script>"
@@ -103,8 +103,67 @@ def test_extract_youtube_videos_supports_current_lockup_renderer() -> None:
 
 def test_extract_youtube_metadata_normalizes_a_timestamp_to_a_date() -> None:
     assert downloader.extract_youtube_metadata(
-        video_html("Episode title", "2026-07-17T06:59:15-07:00")
-    ) == {"title": "Episode title", "published_at": "2026-07-17"}
+        video_html("Episode title", "2026-07-17T06:59:15-07:00", author="Interesting Show")
+    ) == {
+        "title": "Episode title",
+        "published_at": "2026-07-17",
+        "show_display_name": "Interesting Show",
+    }
+
+
+@pytest.mark.parametrize(
+    ("url", "video_id"),
+    [
+        ("https://www.youtube.com/watch?v=video__1234", "video__1234"),
+        ("https://youtu.be/video__1234?t=10", "video__1234"),
+        ("https://www.youtube.com/shorts/video__1234", "video__1234"),
+        ("https://m.youtube.com/live/video__1234", "video__1234"),
+    ],
+)
+def test_parse_youtube_video_url_normalizes_supported_forms(url: str, video_id: str) -> None:
+    assert downloader.parse_youtube_video_url(url) == (
+        video_id,
+        f"https://www.youtube.com/watch?v={video_id}",
+    )
+
+
+def test_queue_user_injected_episode_is_deduplicated_without_a_monitored_show() -> None:
+    queue = downloader.empty_queue(sample_config()["shows"])
+    episode, added = downloader.queue_user_injected_episode(
+        queue, "https://youtu.be/video__1234", added_at="2026-07-23T00:00:00Z"
+    )
+
+    assert added is True
+    assert episode["show_id"] == "user-injected"
+    assert episode["show_display_name"] == "User-injected"
+    assert episode["source_url"] == "https://www.youtube.com/watch?v=video__1234"
+    assert episode["download"]["status"] == "pending"
+    assert "user-injected" not in queue["shows"]
+
+    existing, added = downloader.queue_user_injected_episode(
+        queue, "https://www.youtube.com/watch?v=video__1234"
+    )
+    assert added is False
+    assert existing is episode
+
+
+def test_queue_user_injected_episode_does_not_duplicate_a_monitored_episode() -> None:
+    config = sample_config()
+    queue = downloader.empty_queue(config["shows"])
+    tracked = downloader.new_episode_record(
+        config["shows"][0],
+        {"video_id": "video__1234", "title": "Tracked episode"},
+        "2026-07-23T00:00:00Z",
+    )
+    queue["episodes"]["youtube:all-in:video__1234"] = tracked
+
+    existing, added = downloader.queue_user_injected_episode(
+        queue, "https://youtu.be/video__1234"
+    )
+
+    assert added is False
+    assert existing is tracked
+    assert list(queue["episodes"]) == ["youtube:all-in:video__1234"]
 
 
 def test_first_discovery_is_limited_to_configured_backlog() -> None:

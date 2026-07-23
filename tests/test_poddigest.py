@@ -160,6 +160,26 @@ def test_discover_only_invokes_only_the_downloader(monkeypatch: pytest.MonkeyPat
     assert discover_only_values == [True]
 
 
+def test_add_episode_queues_only_the_user_injected_record(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    config_path = write_config(tmp_path)
+    for module, function in (
+        (poddigest.downloader, "run_downloader"),
+        (poddigest.transcript_scrubber, "run_scrubber"),
+        (poddigest.summarizer, "run_summarizer"),
+        (poddigest.delivery, "run_delivery"),
+    ):
+        monkeypatch.setattr(module, function, lambda *_args, **_kwargs: pytest.fail("a workflow stage should not run"))
+
+    assert poddigest.main(
+        ["--config", str(config_path), "--add-episode", "https://youtu.be/video__1234", "--no-live"]
+    ) == 0
+    queue = json.loads((tmp_path / "queue.json").read_text(encoding="utf-8"))
+    assert "youtube:user-injected:video__1234" in queue["episodes"]
+    assert "Queued: https://www.youtube.com/watch?v=video__1234" in capsys.readouterr().out
+
+
 def test_failure_does_not_block_delivery_and_returns_retryable_exit_code(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
