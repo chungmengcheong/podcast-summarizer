@@ -213,8 +213,11 @@ def test_successful_download_updates_stage(tmp_path: Path) -> None:
 
     assert report.downloaded == 1
     assert episode["download"]["status"] == "succeeded"
-    assert episode["summary"]["status"] == "pending"
+    assert episode["scrub"]["status"] == "pending"
+    assert episode["summary"]["status"] == "not_ready"
     assert calls[0].name == "20260717-all-in-video__1234-final-title.txt"
+    assert calls[0].parent.name == "raw"
+    assert episode["raw_transcript_path"] == str(calls[0].relative_to(tmp_path))
 
 
 def test_pause_between_download_attempts_is_randomized(tmp_path: Path) -> None:
@@ -397,3 +400,32 @@ def test_load_config_rejects_pause_shorter_than_three_seconds(tmp_path: Path) ->
 
     with pytest.raises(downloader.ConfigurationError, match="at least 3"):
         downloader.load_config(path)
+
+
+def test_load_queue_upgrades_pre_scrubber_episode_records(tmp_path: Path) -> None:
+    config = sample_config()
+    queue_path = tmp_path / "queue.json"
+    queue_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "shows": {"all-in": {"last_successful_check_at": None}},
+                "episodes": {
+                    "youtube:all-in:video__1234": {
+                        "transcript_path": "transcripts/legacy.txt",
+                        "download": {"status": "succeeded"},
+                        "summary": {"status": "pending"},
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    queue = downloader.load_queue(queue_path, config["shows"])
+    episode = queue["episodes"]["youtube:all-in:video__1234"]
+
+    assert episode["raw_transcript_path"] == "transcripts/legacy.txt"
+    assert "transcript_path" not in episode
+    assert episode["scrub"]["status"] == "pending"
+    assert episode["summary"]["status"] == "not_ready"

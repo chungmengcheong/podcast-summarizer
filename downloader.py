@@ -161,6 +161,10 @@ def load_queue(path: Path, shows: Iterable[dict[str, Any]]) -> dict[str, Any]:
         raise ConfigurationError("queue.json must contain shows and episodes objects.")
     for show in shows:
         queue["shows"].setdefault(show["id"], {"last_successful_check_at": None})
+    for episode in queue["episodes"].values():
+        if not isinstance(episode, dict):
+            raise ConfigurationError("Each queue episode must be an object.")
+        ensure_episode_lifecycle(episode)
     return queue
 
 
@@ -272,9 +276,17 @@ def new_episode_record(show: dict[str, Any], video: dict[str, str], discovered_a
         "title": video["title"],
         "published_at": None,
         "discovered_at": discovered_at,
-        "transcript_path": None,
+        "raw_transcript_path": None,
+        "scrubbed_transcript_path": None,
         "download": {
             "status": "pending",
+            "attempt_count": 0,
+            "last_attempt_at": None,
+            "completed_at": None,
+            "last_error": None,
+        },
+        "scrub": {
+            "status": "not_ready",
             "attempt_count": 0,
             "last_attempt_at": None,
             "completed_at": None,
@@ -288,6 +300,38 @@ def new_episode_record(show: dict[str, Any], video: dict[str, str], discovered_a
             "last_error": None,
         },
     }
+
+
+def stage_state(status: str) -> dict[str, Any]:
+    """Create the standard queue state for a processing stage."""
+    return {
+        "status": status,
+        "attempt_count": 0,
+        "last_attempt_at": None,
+        "completed_at": None,
+        "last_error": None,
+    }
+
+
+def ensure_episode_lifecycle(episode: dict[str, Any]) -> None:
+    """Upgrade pre-scrubber queue records in memory without losing their raw path."""
+    if "raw_transcript_path" not in episode:
+        episode["raw_transcript_path"] = episode.pop("transcript_path", None)
+    episode.setdefault("scrubbed_transcript_path", None)
+
+    download = episode.get("download", {})
+    if not isinstance(download, dict):
+        raise ConfigurationError("Each episode download state must be an object.")
+    if "scrub" not in episode:
+        scrub_status = "pending" if download.get("status") == "succeeded" else "not_ready"
+        episode["scrub"] = stage_state(scrub_status)
+        # Older downloads made a summary ready immediately. It must now wait
+        # for the intermediate scrub stage.
+        summary = episode.get("summary")
+        if isinstance(summary, dict) and summary.get("status") == "pending":
+            summary["status"] = "not_ready"
+    if not isinstance(episode["scrub"], dict):
+        raise ConfigurationError("Each episode scrub state must be an object.")
 
 
 def discover_show(
@@ -325,7 +369,7 @@ def slugify(value: str) -> str:
     return slug[:80].rstrip("-") or "untitled"
 
 
-def transcript_path_for_episode(transcripts_dir: Path, episode: dict[str, Any]) -> Path:
+def raw_transcript_path_for_episode(transcripts_dir: Path, episode: dict[str, Any]) -> Path:
     published_at = episode.get("published_at")
     if not isinstance(published_at, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", published_at):
         raise ValueError("Episode has no ISO publication date.")
@@ -337,7 +381,7 @@ def transcript_path_for_episode(transcripts_dir: Path, episode: dict[str, Any]) 
             slugify(episode["title"]),
         ]
     ) + ".txt"
-    return transcripts_dir / filename
+    return transcripts_dir / "raw" / filename
 
 
 def wait_for_transcript_access(page: Any, timeout_seconds: int) -> None:
@@ -539,7 +583,7 @@ def run_downloader(
             write_json_atomically(queue_path, queue)
             try:
                 enrich_episode_metadata(episode, fetcher)
-                destination = transcript_path_for_episode(transcripts_dir, episode)
+                destination = raw_transcript_path_for_episode(transcripts_dir, episode)
                 if downloader is not None:
                     downloader(
                         episode,
@@ -557,7 +601,7 @@ def run_downloader(
                         )
                         browser_session.open()
                     browser_session.download(episode, destination)
-                episode["transcript_path"] = str(destination.relative_to(config_root))
+                episode["raw_transcript_path"] = str(destination.relative_to(config_root))
                 download_state.update(
                     {
                         "status": "succeeded",
@@ -565,7 +609,8 @@ def run_downloader(
                         "last_error": None,
                     }
                 )
-                episode["summary"]["status"] = "pending"
+                episode["scrub"] = stage_state("pending")
+                episode["summary"] = stage_state("not_ready")
                 report.downloaded += 1
             except Exception as error:
                 download_state.update(

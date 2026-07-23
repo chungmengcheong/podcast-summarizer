@@ -15,8 +15,9 @@ For both formats, the scrubber will:
 - Remove timestamp tokens only when they appear at the beginning of a line,
   supporting both `MM:SS` and `HH:MM:SS`.
 - Collapse line breaks and repeated whitespace into ordinary single spaces.
-- Preserve `>>` speaker-turn markers exactly, because they carry useful
-  discussion structure even though they do not identify a speaker.
+- Preserve `>>` speaker-turn markers exactly and begin each marker on a new
+  line, because they carry useful discussion structure even though they do not
+  identify a speaker.
 - Preserve all non-formatting text; it will not correct transcription errors,
   infer speaker names, or rewrite prose.
 
@@ -39,3 +40,7 @@ transcripts/
 
 The implementation will include fixture-based unit tests for both timestamp
 formats, timestamp-free text, speaker markers, and idempotence.
+
+Use `python transcript_scrubber.py --config config.json --force` to recreate
+existing scrubbed transcripts from their raw source files after changing the
+normalization rules.
