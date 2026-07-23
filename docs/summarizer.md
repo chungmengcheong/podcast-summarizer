@@ -114,8 +114,7 @@ For every eligible episode, the summarizer should:
 2. **Default:** Codex is the configured default provider.
 3. **Long transcripts:** Fail visibly when a transcript exceeds the configured
    input limit. Do not silently chunk and synthesize.
-4. **Acceptance:** Quality review is manual, using representative All-In and
-   20VC summaries. Review factual fidelity, evidence traceability, signal
+4. **Acceptance:** Quality review is manual. Review factual fidelity, evidence traceability, signal
    selection, and useful writing before expanding the implementation.
 
 ## Initial manual acceptance

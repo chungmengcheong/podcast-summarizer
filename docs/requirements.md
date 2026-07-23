@@ -57,7 +57,6 @@ The exact prompt and template are stored in editable local files so the user can
 v1 does not need:
 - web UI
 - account system
-- automatic scheduling
 - fallback to alternative sources for transcripts
  
  

@@ -6,8 +6,6 @@ This is a living record of decisions and system-design thinking.
 
 The downloader component discovers episodes, records newly seen source IDs/URLs in the queue, accepts one-off YouTube episodes, and retrieves transcripts.
 
-For context, see 'Working architecture hypothesis' section in `plan.md`. 
-
 ## Input / Output contract
 
 ### Input
@@ -220,20 +218,6 @@ There is one independent status for each downstream stage. The downloader owns o
 
 A failed download or scrub remains retryable on the next run of its respective command. `attempt_count`, `last_attempt_at`, and `last_error` make the failure inspectable without requiring a separate log database.
 
-
-## Preconditions before coding
-
-1. **Complete, 2026-07-22:** The 20VC videos page exposed ordinary
-   `/watch?v=<video-id>` links, including the supplied representative video.
-   The browser diagnostic successfully exercised its transcript Copy and
-   Download controls for `HoRaqNWKcpM`.
-2. **Complete:** `python downloader.py --config config.json` discovers and
-   downloads in one run. `--discover-only` updates and reports the queue
-   without opening the browser.
-3. **Complete:** The repository supplies `config.json` and `queue.json`; an
-   initial queue has no episodes. The downloader creates `transcripts/` if
-   absent and writes JSON by replacing a temporary file in the same directory,
-   so an interrupted run does not leave a partial queue.
 
 ## Commands
 
