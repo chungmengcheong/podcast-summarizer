@@ -24,6 +24,7 @@ from downloader import (
     write_json_atomically,
 )
 from transcript_scrubber import write_text_atomically
+from queue_lock import QueueLock, QueueLockUnavailable
 
 
 REQUIRED_HEADINGS = (
@@ -299,15 +300,16 @@ def main() -> int:
     try:
         config = load_config(config_path)
         queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
-        queue = load_queue(queue_path, config["shows"])
-        report = run_summarizer(
-            config,
-            queue,
-            queue_path,
-            config_path.parent,
-            force=args.force,
-        )
-    except (ConfigurationError, OSError, SummarizerError) as error:
+        with QueueLock(queue_path):
+            queue = load_queue(queue_path, config["shows"])
+            report = run_summarizer(
+                config,
+                queue,
+                queue_path,
+                config_path.parent,
+                force=args.force,
+            )
+    except (ConfigurationError, OSError, QueueLockUnavailable, SummarizerError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 

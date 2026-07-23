@@ -7,7 +7,7 @@ As a busy but interested person, I want transcripts of new episodes of podcast s
 
 ## User experience 
 
-1. User runs the command-line tool manually. Scheduling is a later increment.
+1. User can run the command-line tool manually or let a macOS LaunchAgent run the same workflow weekly on Friday at 3:00 p.m. Pacific time. Concurrent invocations safely skip rather than modify the queue simultaneously.
 2. Tool checks each source for episodes published since its last successful check, queues newly discovered episodes, and downloads their transcripts, e.g., `All_In-20260327-Anthropic's Generational Run, OpenAI Panics, AI Moats, Meta Loses Major Lawsuits.txt`
 3. Tool generates markdown summaries from the downloaded transcripts. e.g., `All_In-20260327-Summary-Anthropic's Generational Run, OpenAI Panics, AI Moats, Meta Loses Major Lawsuits.md`
 4. Summaries are collated into a single markdown file, e.g., `20260327-summaries.md`

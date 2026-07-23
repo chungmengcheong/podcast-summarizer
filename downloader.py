@@ -29,6 +29,8 @@ from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
+from queue_lock import QueueLock, QueueLockUnavailable
+
 
 YOUTUBE_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36"
 TRANSCRIPT_SOURCE = "youtube-transcript-ui"
@@ -720,23 +722,24 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config(config_path)
         queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
-        queue = load_queue(queue_path, config["shows"])
-        if args.add_episode:
-            episode, added = queue_user_injected_episode(queue, args.add_episode)
-            if added:
-                write_json_atomically(queue_path, queue)
-                print(f"Queued: {episode['source_url']}")
-            else:
-                print(f"Already queued: {episode['source_url']}")
-            return 0
-        report = run_downloader(
-            config,
-            queue,
-            queue_path,
-            config_path.parent,
-            args.discover_only,
-        )
-    except (ConfigurationError, OSError, ValueError) as error:
+        with QueueLock(queue_path):
+            queue = load_queue(queue_path, config["shows"])
+            if args.add_episode:
+                episode, added = queue_user_injected_episode(queue, args.add_episode)
+                if added:
+                    write_json_atomically(queue_path, queue)
+                    print(f"Queued: {episode['source_url']}")
+                else:
+                    print(f"Already queued: {episode['source_url']}")
+                return 0
+            report = run_downloader(
+                config,
+                queue,
+                queue_path,
+                config_path.parent,
+                args.discover_only,
+            )
+    except (ConfigurationError, OSError, QueueLockUnavailable, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 

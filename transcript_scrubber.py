@@ -19,6 +19,7 @@ from downloader import (
     utc_now,
     write_json_atomically,
 )
+from queue_lock import QueueLock, QueueLockUnavailable
 
 
 TIMESTAMP_PREFIX = re.compile(r"^(?:(?:\d{1,2}:)?\d{1,2}:\d{2})(?=\s|$)\s*")
@@ -154,9 +155,10 @@ def main() -> int:
     try:
         config = load_config(config_path)
         queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
-        queue = load_queue(queue_path, config["shows"])
-        report = run_scrubber(config, queue, queue_path, config_path.parent, force=args.force)
-    except (ConfigurationError, OSError) as error:
+        with QueueLock(queue_path):
+            queue = load_queue(queue_path, config["shows"])
+            report = run_scrubber(config, queue, queue_path, config_path.parent, force=args.force)
+    except (ConfigurationError, OSError, QueueLockUnavailable) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 

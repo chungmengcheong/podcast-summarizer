@@ -170,10 +170,19 @@ The final line says `completed`, `completed with warnings`, `completed with
 failures`, or `could not complete`; it never forces the user to infer the
 outcome from the exit code alone.
 
+## Scheduling and concurrency
+
+Every executable command takes a non-blocking single-writer lock around its
+queue lifecycle. The stable lock is the ignored sibling `.queue.json.lock`,
+because `queue.json` itself is atomically replaced during state updates. A
+busy queue exits with code 2 before a component or run log is started.
+
+The macOS LaunchAgent setup lives in [scheduling.md](scheduling.md). It runs
+the ordinary orchestrator every Friday at 3:00 p.m. local time and safely
+skips rather than overlaps an active manual invocation.
+
 ## Deferred decisions
 
-- A single-writer lock around `queue.json` is deferred until scheduling or
-  overlapping runs are introduced.
 - Per-episode live progress is out of scope. It would require callbacks from
   component loops so the orchestrator could show granular progress such as
   `2 of 5`; the current contract only needs a truthful stage-level

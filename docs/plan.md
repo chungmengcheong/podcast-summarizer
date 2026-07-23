@@ -6,7 +6,7 @@ This is a living record of decisions and system-design thinking. It is intention
 
 A manual Python command-line tool checks All-In and 20VC for episodes published since its last successful source check, queues newly discovered episodes, downloads and normalizes transcripts from one selected transcript source, produces an editable-template Markdown summary for each normalized episode, creates a collated Markdown reading file, copies that file to a configured Obsidian-vault folder, optionally creates an Instapaper reminder, and reports successes and failures. Raw, scrubbed, and per-episode summary artifacts remain in their current folders.
 
-Automatic scheduling is a deferred increment. Instapaper is a best-effort, non-blocking reminder: its failure is reported but does not undo a successful Obsidian delivery.
+Automatic scheduling uses a per-user macOS LaunchAgent; see [scheduling.md](scheduling.md). Instapaper is a best-effort, non-blocking reminder: its failure is reported but does not undo a successful Obsidian delivery.
 
 ## Working architecture hypothesis
 
@@ -63,4 +63,4 @@ delivery.py         create one collated Markdown reading file
 3. **Local summarization:** Given a scrubbed transcript file, generate a summary file using the editable prompt/template. No additional scraping or Obsidian copy.
 4. **Delivery:** Add full multi-episode delivery-state handling, a collated reading file, Obsidian copy, a best-effort Instapaper reminder, and a clear run report. Keep local artifacts in their existing folders.
 5. **Reliability pass:** Add per-episode error records, safe retries on later runs, and tests around state and file organization.
-6. **Scheduling:** Add a Mac-appropriate scheduled invocation once the manual command is trusted.
+6. **Scheduling:** Implemented as a Friday 3:00 p.m. local-time macOS LaunchAgent with a single-writer queue lock. Validate several unattended runs before changing the downloader's browser mode.

@@ -15,6 +15,7 @@ import delivery
 import downloader
 import summarizer
 import transcript_scrubber
+from queue_lock import QueueLock, QueueLockUnavailable
 
 
 STAGES = ("download", "scrub", "summarize", "delivery")
@@ -185,9 +186,27 @@ def run_workflow(
     output: TextIO | None = None,
     diagnostics: TextIO | None = None,
 ) -> int:
-    """Run selected stages and return the documented process exit code."""
+    """Run selected stages while holding the queue's single-writer lock."""
     output = output or sys.stdout
     diagnostics = diagnostics or sys.stderr
+    config_path = args.config.resolve()
+    queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
+    try:
+        with QueueLock(queue_path):
+            return _run_workflow_locked(args, output=output, diagnostics=diagnostics)
+    except QueueLockUnavailable as error:
+        diagnostics.write(f"ERROR: {safe_message(error)}\n")
+        diagnostics.flush()
+        return 2
+
+
+def _run_workflow_locked(
+    args: argparse.Namespace,
+    *,
+    output: TextIO,
+    diagnostics: TextIO,
+) -> int:
+    """Run selected stages and return the documented process exit code."""
     config_path = args.config.resolve()
     queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
     logger = RunLogger(config_path.parent / "logs" / "runs")

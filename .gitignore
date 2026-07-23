@@ -12,6 +12,7 @@ htmlcov/
 .playwright-profile/
 transcripts/
 queue.json
+.queue.json.lock
 .queue.json.*.tmp
 logs/
 

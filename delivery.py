@@ -16,6 +16,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from downloader import ConfigurationError, load_config, load_queue, stage_state, utc_now, write_json_atomically
+from queue_lock import QueueLock, QueueLockUnavailable
 from transcript_scrubber import write_text_atomically
 
 
@@ -281,9 +282,10 @@ def main() -> int:
     try:
         config = load_config(config_path)
         queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
-        queue = load_queue(queue_path, config["shows"])
-        report = run_delivery(config, queue, queue_path, config_path.parent)
-    except (ConfigurationError, OSError, DeliveryError) as error:
+        with QueueLock(queue_path):
+            queue = load_queue(queue_path, config["shows"])
+            report = run_delivery(config, queue, queue_path, config_path.parent)
+    except (ConfigurationError, OSError, DeliveryError, QueueLockUnavailable) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 
