@@ -184,13 +184,13 @@ def test_force_includes_an_already_successful_summary() -> None:
     assert summarizer.pending_summaries(queue, force=True) == [episode]
 
 
-def test_pending_summaries_can_be_limited_to_source_episode_ids() -> None:
-    selected = sample_episode()
-    unselected = sample_episode()
-    unselected["source_episode_id"] = "other_video"
-    queue = {"episodes": {"selected": selected, "unselected": unselected}}
+def test_pending_summaries_returns_all_eligible_episodes() -> None:
+    first = sample_episode()
+    second = sample_episode()
+    second["source_episode_id"] = "other_video"
+    queue = {"episodes": {"first": first, "second": second}}
 
-    assert summarizer.pending_summaries(queue, source_episode_ids={"video__1234"}) == [selected]
+    assert summarizer.pending_summaries(queue) == [first, second]
 
 
 def test_run_codex_uses_a_noninteractive_read_only_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

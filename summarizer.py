@@ -69,7 +69,6 @@ def load_summarizer_config(config: dict[str, Any]) -> dict[str, Any]:
 def pending_summaries(
     queue: dict[str, Any],
     force: bool = False,
-    source_episode_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Return summaries that can be created without downloading or scrubbing again."""
     eligible_statuses = {"pending", "failed"}
@@ -80,10 +79,6 @@ def pending_summaries(
         for episode in queue["episodes"].values()
         if episode.get("scrub", {}).get("status") == "succeeded"
         and episode.get("summary", {}).get("status") in eligible_statuses
-        and (
-            source_episode_ids is None
-            or episode.get("source_episode_id") in source_episode_ids
-        )
     ]
 
 
@@ -212,7 +207,6 @@ def run_summarizer(
     queue_path: Path,
     config_root: Path,
     force: bool = False,
-    source_episode_ids: set[str] | None = None,
     runner: SummaryRunner = run_codex,
 ) -> SummaryReport:
     """Summarize all eligible scrubbed transcripts and persist each outcome."""
@@ -226,7 +220,7 @@ def run_summarizer(
         raise SummarizerError("Prompt file was empty.")
 
     report = SummaryReport()
-    for episode in pending_summaries(queue, force=force, source_episode_ids=source_episode_ids):
+    for episode in pending_summaries(queue, force=force):
         summary_state = episode["summary"]
         summary_state["attempt_count"] = summary_state.get("attempt_count", 0) + 1
         summary_state["last_attempt_at"] = utc_now()
@@ -284,12 +278,6 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Regenerate summaries whose current status is succeeded.",
     )
-    parser.add_argument(
-        "--episode-id",
-        action="append",
-        dest="source_episode_ids",
-        help="Summarize only this source episode ID; repeat to select several episodes.",
-    )
     return parser.parse_args()
 
 
@@ -306,7 +294,6 @@ def main() -> int:
             queue_path,
             config_path.parent,
             force=args.force,
-            source_episode_ids=set(args.source_episode_ids) if args.source_episode_ids else None,
         )
     except (ConfigurationError, OSError, SummarizerError) as error:
         print(f"ERROR: {error}", file=sys.stderr)

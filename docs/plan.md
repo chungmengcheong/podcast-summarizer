@@ -33,7 +33,7 @@ Summarizer.py  take queued normalized transcripts and invoke the selected local 
     |
     |  summary.md for each episode 
     V
-post_processor.py   create one collated Markdown reading file
+delivery.py         create one collated Markdown reading file
     |                move collated Markdown reading file to Obsidian
     |                create a non-blocking Instapaper reminder
     |
@@ -61,7 +61,6 @@ post_processor.py   create one collated Markdown reading file
 1. **Single-source ingestion:** Discover and download one new transcript per supported show; persist normalized metadata and local files. Completed for All-In and 20VC.
 2. **Transcript normalization:** Given a downloaded raw transcript, create and persist a scrubbed transcript using deterministic, source-aware formatting rules. Add unit tests for every observed source format.
 3. **Local summarization:** Given a scrubbed transcript file, generate a summary file using the editable prompt/template. No additional scraping or Obsidian copy.
-4. **Post-processing and delivery:** Add full multi-episode delivery-state handling, a collated reading file, Obsidian copy, a best-effort Instapaper reminder, and a clear run report. Keep local artifacts in their existing folders.
+4. **Delivery:** Add full multi-episode delivery-state handling, a collated reading file, Obsidian copy, a best-effort Instapaper reminder, and a clear run report. Keep local artifacts in their existing folders.
 5. **Reliability pass:** Add per-episode error records, safe retries on later runs, and tests around state and file organization.
 6. **Scheduling:** Add a Mac-appropriate scheduled invocation once the manual command is trusted.
-

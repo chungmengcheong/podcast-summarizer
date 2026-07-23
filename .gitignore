@@ -13,6 +13,7 @@ htmlcov/
 transcripts/
 queue.json
 .queue.json.*.tmp
+logs/
 
 # Optional Playwright artifacts, if enabled later
 test-results/

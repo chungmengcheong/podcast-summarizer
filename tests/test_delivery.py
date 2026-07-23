@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import downloader
-import post_processor
+import delivery
 
 
 def sample_config(obsidian_target_dir: Path) -> dict:
@@ -23,7 +23,7 @@ def sample_config(obsidian_target_dir: Path) -> dict:
             "request_pause_seconds": 3,
             "max_new_episodes_per_show": 1,
         },
-        "post_processor": {
+        "delivery": {
             "obsidian_target_dir": str(obsidian_target_dir),
             "instapaper_url": "http://www.nourl.com",
         },
@@ -62,10 +62,10 @@ def test_pending_deliveries_is_newest_first_and_excludes_delivered() -> None:
     delivered["delivery"] = downloader.stage_state("succeeded")
     queue = {"episodes": {"old": oldest, "new": newest, "done": delivered}}
 
-    assert post_processor.pending_deliveries(queue) == [newest, oldest]
+    assert delivery.pending_deliveries(queue) == [newest, oldest]
 
 
-def test_run_post_processor_delivers_one_newest_first_batch_and_marks_queue(tmp_path: Path) -> None:
+def test_run_delivery_delivers_one_newest_first_batch_and_marks_queue(tmp_path: Path) -> None:
     obsidian_dir = tmp_path / "obsidian"
     config = sample_config(obsidian_dir)
     oldest = episode("old", "2026-07-15", write_summary(tmp_path, "old.md", "Old summary"))
@@ -75,7 +75,7 @@ def test_run_post_processor_delivers_one_newest_first_batch_and_marks_queue(tmp_
     (tmp_path / ".env").write_text("INSTAPAPER_USERNAME=user\nINSTAPAPER_PASSWORD=password\n", encoding="utf-8")
     calls: list[tuple[str, str, str, str, str]] = []
 
-    report = post_processor.run_post_processor(
+    report = delivery.run_delivery(
         config,
         queue,
         queue_path,
@@ -106,7 +106,7 @@ def test_instapaper_failure_warns_without_undoing_obsidian_delivery(tmp_path: Pa
     queue_path = tmp_path / "queue.json"
     (tmp_path / ".env").write_text("INSTAPAPER_USERNAME=user\nINSTAPAPER_PASSWORD=password\n", encoding="utf-8")
 
-    report = post_processor.run_post_processor(
+    report = delivery.run_delivery(
         config,
         queue,
         queue_path,
@@ -118,7 +118,7 @@ def test_instapaper_failure_warns_without_undoing_obsidian_delivery(tmp_path: Pa
     assert report.failed_deliveries == 0
     assert report.instapaper_warning == "network unavailable"
     assert record["delivery"]["status"] == "succeeded"
-    assert post_processor.pending_deliveries(queue) == []
+    assert delivery.pending_deliveries(queue) == []
 
 
 def test_existing_different_obsidian_file_is_a_retryable_delivery_failure(tmp_path: Path) -> None:
@@ -131,7 +131,7 @@ def test_existing_different_obsidian_file_is_a_retryable_delivery_failure(tmp_pa
     expected_destination.parent.mkdir(parents=True)
     expected_destination.write_text("# A different note\n", encoding="utf-8")
 
-    report = post_processor.run_post_processor(config, queue, queue_path, tmp_path)
+    report = delivery.run_delivery(config, queue, queue_path, tmp_path)
 
     assert report.delivered == 0
     assert report.failed_deliveries == 1
@@ -140,9 +140,9 @@ def test_existing_different_obsidian_file_is_a_retryable_delivery_failure(tmp_pa
     assert expected_destination.read_text(encoding="utf-8") == "# A different note\n"
 
 
-def test_post_processor_config_requires_an_absolute_obsidian_path(tmp_path: Path) -> None:
+def test_delivery_config_requires_an_absolute_obsidian_path(tmp_path: Path) -> None:
     config = sample_config(tmp_path / "obsidian")
-    config["post_processor"]["obsidian_target_dir"] = "relative"
+    config["delivery"]["obsidian_target_dir"] = "relative"
 
     with pytest.raises(downloader.ConfigurationError, match="absolute"):
-        post_processor.load_post_processor_config(config)
+        delivery.load_delivery_config(config)

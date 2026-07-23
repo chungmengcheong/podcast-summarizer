@@ -113,21 +113,17 @@ For every eligible episode, the summarizer should:
    20VC summaries. Review factual fidelity, evidence traceability, signal
    selection, and useful writing before expanding the implementation.
 
-## Initial manual acceptance inputs
+## Initial manual acceptance
 
-After the downloader and scrubber have created queue records for these files,
-run only the initial acceptance set with:
+After the downloader and scrubber have created queue records, run the
+summarizer against every eligible episode with:
 
 ```bash
-uv run python summarizer.py --config config.json \
-  --episode-id HoRaqNWKcpM \
-  --episode-id 9IMwRIei-Xc
+uv run python summarizer.py --config config.json
 ```
 
-The selected scrubbed transcripts are:
-
-- `transcripts/scrubbed/20260716-20vc-HoRaqNWKcpM-zuckerberg-back-on-x-challenging-codex-claude-code-sk-hynixs-26bn-ipo.txt`
-- `transcripts/scrubbed/20260717-all-in-9IMwRIei-Xc-can-the-ai-industry-regulate-itself-stripe-wants-paypal-china-catches-up-ny-bans.txt`
+The queue is the selection mechanism: it retries pending and failed summaries
+without a separate episode-selection flag.
 
 Speaker identification and timestamp citations are not blockers because the
 current normalized transcripts do not reliably contain them. Add them later

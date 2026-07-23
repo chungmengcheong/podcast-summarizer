@@ -22,7 +22,7 @@ from transcript_scrubber import write_text_atomically
 InstapaperSender = Callable[[str, str, str, str, str], None]
 
 
-class PostProcessorError(RuntimeError):
+class DeliveryError(RuntimeError):
     """Raised when a delivery batch cannot be created safely."""
 
 
@@ -36,31 +36,31 @@ class DeliveryReport:
     instapaper_warning: str | None = None
 
 
-def load_post_processor_config(config: dict[str, Any]) -> dict[str, Any]:
+def load_delivery_config(config: dict[str, Any]) -> dict[str, Any]:
     """Validate delivery-specific configuration."""
     paths = config.get("paths")
     if not isinstance(paths, dict) or not isinstance(paths.get("transcripts_dir"), str):
         raise ConfigurationError("config.paths must define transcripts_dir.")
 
-    post_processor = config.get("post_processor")
-    if not isinstance(post_processor, dict):
-        raise ConfigurationError("config.post_processor must be an object.")
-    target_dir = post_processor.get("obsidian_target_dir")
+    delivery = config.get("delivery")
+    if not isinstance(delivery, dict):
+        raise ConfigurationError("config.delivery must be an object.")
+    target_dir = delivery.get("obsidian_target_dir")
     if not isinstance(target_dir, str) or not target_dir.strip():
-        raise ConfigurationError("config.post_processor.obsidian_target_dir must be a non-empty path.")
+        raise ConfigurationError("config.delivery.obsidian_target_dir must be a non-empty path.")
     if not Path(target_dir).expanduser().is_absolute():
-        raise ConfigurationError("config.post_processor.obsidian_target_dir must be an absolute path.")
-    instapaper_url = post_processor.get("instapaper_url")
+        raise ConfigurationError("config.delivery.obsidian_target_dir must be an absolute path.")
+    instapaper_url = delivery.get("instapaper_url")
     if not isinstance(instapaper_url, str) or not instapaper_url.startswith(("http://", "https://")):
-        raise ConfigurationError("config.post_processor.instapaper_url must be an HTTP(S) URL.")
-    return post_processor
+        raise ConfigurationError("config.delivery.instapaper_url must be an HTTP(S) URL.")
+    return delivery
 
 
 def delivery_state(episode: dict[str, Any]) -> dict[str, Any]:
     """Get or create the lifecycle state for an episode's durable delivery."""
     state = episode.setdefault("delivery", stage_state("pending"))
     if not isinstance(state, dict):
-        raise PostProcessorError("Episode delivery state must be an object.")
+        raise DeliveryError("Episode delivery state must be an object.")
     return state
 
 
@@ -79,40 +79,40 @@ def pending_deliveries(queue: dict[str, Any]) -> list[dict[str, Any]]:
 def validated_summary_path(config_root: Path, episode: dict[str, Any]) -> Path:
     raw_path = episode.get("summary_path")
     if not isinstance(raw_path, str) or not raw_path:
-        raise PostProcessorError("Episode has no summary_path.")
+        raise DeliveryError("Episode has no summary_path.")
     candidate = (config_root / raw_path).resolve()
     try:
         candidate.relative_to(config_root.resolve())
     except ValueError as error:
-        raise PostProcessorError("Episode summary_path must stay inside the repository.") from error
+        raise DeliveryError("Episode summary_path must stay inside the repository.") from error
     if not candidate.is_file():
-        raise PostProcessorError(f"Summary file does not exist: {raw_path}")
+        raise DeliveryError(f"Summary file does not exist: {raw_path}")
     return candidate
 
 
 def parse_published_date(episode: dict[str, Any]) -> date:
     value = episode.get("published_at")
     if not isinstance(value, str):
-        raise PostProcessorError("Episode has no published_at date.")
+        raise DeliveryError("Episode has no published_at date.")
     try:
         return date.fromisoformat(value)
     except ValueError as error:
-        raise PostProcessorError("Episode published_at must be an ISO date.") from error
+        raise DeliveryError("Episode published_at must be an ISO date.") from error
 
 
 def batch_title(episodes: list[dict[str, Any]]) -> str:
     if not episodes:
-        raise PostProcessorError("Cannot create a batch without summaries.")
+        raise DeliveryError("Cannot create a batch without summaries.")
     dates = [parse_published_date(episode) for episode in episodes]
     return f"{min(dates):%Y%m%d}-{max(dates):%Y%m%d}-{len(episodes)} summaries"
 
 
 def build_collated_markdown(title: str, summary_texts: list[str]) -> str:
     if not summary_texts:
-        raise PostProcessorError("Cannot create a collated file without summary content.")
+        raise DeliveryError("Cannot create a collated file without summary content.")
     normalized = [text.strip() for text in summary_texts]
     if any(not text for text in normalized):
-        raise PostProcessorError("Summary file was empty.")
+        raise DeliveryError("Summary file was empty.")
     return f"# {title}\n\n" + "\n\n---\n\n".join(normalized) + "\n"
 
 
@@ -122,9 +122,9 @@ def write_obsidian_copy(destination: Path, content: str) -> None:
         try:
             existing = destination.read_text(encoding="utf-8")
         except OSError as error:
-            raise PostProcessorError(f"Could not read existing Obsidian file: {error}") from error
+            raise DeliveryError(f"Could not read existing Obsidian file: {error}") from error
         if existing != content:
-            raise PostProcessorError(f"Obsidian destination already exists with different content: {destination}")
+            raise DeliveryError(f"Obsidian destination already exists with different content: {destination}")
         return
     write_text_atomically(destination, content)
 
@@ -155,7 +155,7 @@ def instapaper_credentials(config_root: Path) -> tuple[str, str]:
     username = os.environ.get("INSTAPAPER_USERNAME") or values.get("INSTAPAPER_USERNAME")
     password = os.environ.get("INSTAPAPER_PASSWORD") or values.get("INSTAPAPER_PASSWORD")
     if not username or not password:
-        raise PostProcessorError("Instapaper credentials are missing from .env or the environment.")
+        raise DeliveryError("Instapaper credentials are missing from .env or the environment.")
     return username, password
 
 
@@ -166,11 +166,11 @@ def send_instapaper_reminder(username: str, password: str, url: str, title: str,
     try:
         with urlopen(request, timeout=30) as response:  # noqa: S310 - API URL is local configuration.
             if not 200 <= response.status < 300:
-                raise PostProcessorError(f"Instapaper returned HTTP {response.status}.")
+                raise DeliveryError(f"Instapaper returned HTTP {response.status}.")
     except HTTPError as error:
-        raise PostProcessorError(f"Instapaper returned HTTP {error.code}.") from error
+        raise DeliveryError(f"Instapaper returned HTTP {error.code}.") from error
     except URLError as error:
-        raise PostProcessorError(f"Instapaper request failed: {error.reason}.") from error
+        raise DeliveryError(f"Instapaper request failed: {error.reason}.") from error
 
 
 def fail_deliveries(episodes: list[dict[str, Any]], error: Exception, report: DeliveryReport) -> None:
@@ -182,7 +182,7 @@ def fail_deliveries(episodes: list[dict[str, Any]], error: Exception, report: De
         report.failures.append(f"{episode.get('source_episode_id', 'unknown')}: {message}")
 
 
-def run_post_processor(
+def run_delivery(
     config: dict[str, Any],
     queue: dict[str, Any],
     queue_path: Path,
@@ -190,7 +190,7 @@ def run_post_processor(
     instapaper_sender: InstapaperSender = send_instapaper_reminder,
 ) -> DeliveryReport:
     """Create and deliver one batch from all successful, undelivered summaries."""
-    post_processor_config = load_post_processor_config(config)
+    delivery_config = load_delivery_config(config)
     report = DeliveryReport()
     candidates = pending_deliveries(queue)
     eligible: list[dict[str, Any]] = []
@@ -202,7 +202,7 @@ def run_post_processor(
             parse_published_date(episode)
             text = summary_path.read_text(encoding="utf-8")
             if not text.strip():
-                raise PostProcessorError("Summary file was empty.")
+                raise DeliveryError("Summary file was empty.")
             eligible.append(episode)
             summary_texts.append(text)
         except Exception as error:
@@ -229,7 +229,7 @@ def run_post_processor(
         content = build_collated_markdown(title, summary_texts)
         local_path = config_root / config["paths"]["transcripts_dir"] / "collated" / f"{title}.md"
         write_text_atomically(local_path, content)
-        obsidian_path = Path(post_processor_config["obsidian_target_dir"]).expanduser() / local_path.name
+        obsidian_path = Path(delivery_config["obsidian_target_dir"]).expanduser() / local_path.name
         write_obsidian_copy(obsidian_path, content)
     except Exception as error:
         fail_deliveries(eligible, error, report)
@@ -256,7 +256,7 @@ def run_post_processor(
         instapaper_sender(
             username,
             password,
-            post_processor_config["instapaper_url"],
+            delivery_config["instapaper_url"],
             title,
             "https://www.instapaper.com/api/add",
         )
@@ -279,8 +279,8 @@ def main() -> int:
         config = load_config(config_path)
         queue_path = (args.queue or config_path.with_name("queue.json")).resolve()
         queue = load_queue(queue_path, config["shows"])
-        report = run_post_processor(config, queue, queue_path, config_path.parent)
-    except (ConfigurationError, OSError, PostProcessorError) as error:
+        report = run_delivery(config, queue, queue_path, config_path.parent)
+    except (ConfigurationError, OSError, DeliveryError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 

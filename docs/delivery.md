@@ -1,8 +1,8 @@
-# Podcast Summarizer — Post-processor Design Notes
+# Podcast Summarizer — Delivery Design Notes
 
 ## Purpose and boundary
 
-The post-processor turns a batch of successfully generated episode summaries
+The delivery component turns a batch of successfully generated episode summaries
 into one Markdown reading file, delivers that file to the configured Obsidian
 folder, and creates a best-effort Instapaper reminder. It does not generate
 summaries, alter raw or scrubbed transcripts, or reorganize local artifacts.
@@ -13,10 +13,10 @@ the included episodes eligible for redelivery.
 
 ## Configuration
 
-`config.json` must define the following post-processor settings:
+`config.json` must define the following delivery settings:
 
 ```json
-"post_processor": {
+"delivery": {
   "obsidian_target_dir": "/Users/ccm/Library/Mobile Documents/iCloud~md~obsidian/Documents/Notes/z_to_read",
   "instapaper_url": "http://www.nourl.com"
 }
@@ -114,7 +114,7 @@ be added if it becomes useful.
 
 ## CLI and run report
 
-`post_processor.py` accepts `--config` and an optional `--queue`, following the
+`delivery.py` accepts `--config` and an optional `--queue`, following the
 existing downloader and summarizer convention. Its report states:
 
 - number of summaries delivered;
