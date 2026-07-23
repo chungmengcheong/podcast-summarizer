@@ -332,6 +332,11 @@ def ensure_episode_lifecycle(episode: dict[str, Any]) -> None:
             summary["status"] = "not_ready"
     if not isinstance(episode["scrub"], dict):
         raise ConfigurationError("Each episode scrub state must be an object.")
+    if "summary" not in episode:
+        summary_status = "pending" if episode["scrub"].get("status") == "succeeded" else "not_ready"
+        episode["summary"] = stage_state(summary_status)
+    if not isinstance(episode["summary"], dict):
+        raise ConfigurationError("Each episode summary state must be an object.")
 
 
 def discover_show(

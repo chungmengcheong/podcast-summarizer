@@ -2,6 +2,7 @@
   "version": 1,
   "paths": {
     "transcripts_dir": "transcripts",
+    "summaries_dir": "summaries",
     "browser_profile_dir": ".playwright-profile/youtube-transcript"
   },
   "downloader": {
@@ -9,6 +10,14 @@
     "page_timeout_seconds": 120,
     "request_pause_seconds": 10,
     "max_new_episodes_per_show": 3
+  },
+  "summarizer": {
+    "provider": "codex",
+    "executable": "codex",
+    "model": null,
+    "timeout_seconds": 600,
+    "max_input_characters": 200000,
+    "prompt_path": "prompts/summary_prompt.md"
   },
   "shows": [
     {
